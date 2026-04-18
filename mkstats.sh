@@ -107,7 +107,7 @@ cat <<HTML
     font-size: 0.85rem;
     color: var(--muted);
   }
-  .contrib-legend span.top3 {
+  .contrib-legend span.top5 {
     font-weight: 700;
     color: var(--text);
   }
@@ -128,7 +128,7 @@ cat <<HTML
       --text: #111;
       --muted: #444;
     }
-    .contrib-legend span.top3 { color: #000; }
+    .contrib-legend span.top5 { color: #000; }
   }
 </style>
 </head>
@@ -156,11 +156,14 @@ cat <<HTML
 </section>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 <script>
 (function () {
   const filesData = ${FILES_JSON};
   const contributorsData = ${CONTRIBUTORS_JSON};
   const monthsData = ${MONTHS_JSON};
+
+  Chart.register(ChartDataLabels);
 
   const palette = [
     '#3d8bfd', '#22c55e', '#f59e0b', '#ec4899', '#8b5cf6', '#14b8a6',
@@ -172,6 +175,28 @@ cat <<HTML
   function truncate(s, max) {
     if (s.length <= max) return s;
     return s.slice(0, max - 1) + '…';
+  }
+
+  /** On-slice labels for top 5 segments (data already sorted by count descending). */
+  function topFivePieLabels(formatLine2) {
+    return {
+      display: function (ctx) {
+        return ctx.dataIndex < 5;
+      },
+      formatter: function (value, ctx) {
+        var name = ctx.chart.data.labels[ctx.dataIndex];
+        return name + '\n' + formatLine2(value, ctx);
+      },
+      color: '#f8fafc',
+      textStrokeColor: 'rgba(15,20,25,0.85)',
+      textStrokeWidth: 3,
+      font: { weight: '700', size: 11, lineHeight: 1.25 },
+      textAlign: 'center',
+      anchor: 'center',
+      align: 'center',
+      clamp: true,
+      clip: false
+    };
   }
 
   Chart.defaults.color = '#8b9cb3';
@@ -197,6 +222,11 @@ cat <<HTML
         responsive: true,
         maintainAspectRatio: true,
         plugins: {
+          datalabels: topFivePieLabels(function (value, ctx) {
+            var sum = filesData.reduce(function (a, d) { return a + d.count; }, 0);
+            var pct = sum ? ((value / sum) * 100).toFixed(1) : '0';
+            return value + ' (' + pct + '%)';
+          }),
           legend: { position: 'right', labels: { boxWidth: 12, padding: 10 } },
           tooltip: {
             callbacks: {
@@ -223,7 +253,7 @@ cat <<HTML
   } else {
     contributorsData.forEach((d, i) => {
       const span = document.createElement('span');
-      if (i < 3) span.className = 'top3';
+      if (i < 5) span.className = 'top5';
       span.textContent = d.name + ': ' + d.count;
       legendEl.appendChild(span);
     });
@@ -243,6 +273,11 @@ cat <<HTML
         responsive: true,
         maintainAspectRatio: true,
         plugins: {
+          datalabels: topFivePieLabels(function (value, ctx) {
+            var sum = contributorsData.reduce(function (a, d) { return a + d.count; }, 0);
+            var pct = sum ? ((value / sum) * 100).toFixed(1) : '0';
+            return value + ' commits (' + pct + '%)';
+          }),
           legend: { display: false },
           tooltip: {
             callbacks: {
@@ -293,7 +328,10 @@ cat <<HTML
             grid: { color: 'rgba(255,255,255,0.06)' }
           }
         },
-        plugins: { legend: { display: false } }
+        plugins: {
+          legend: { display: false },
+          datalabels: { display: false }
+        }
       }
     });
   }
