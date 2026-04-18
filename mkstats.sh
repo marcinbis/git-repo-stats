@@ -1,0 +1,304 @@
+#!/bin/bash
+set -euo pipefail
+
+json_files() {
+	python3 -c '
+import sys, json
+rows = []
+for line in sys.stdin:
+	line = line.strip()
+	if not line:
+		continue
+	parts = line.split(None, 1)
+	if len(parts) == 2:
+		rows.append({"count": int(parts[0]), "name": parts[1]})
+print(json.dumps(rows))
+'
+}
+
+json_months() {
+	python3 -c '
+import sys, json
+rows = []
+for line in sys.stdin:
+	line = line.strip()
+	if not line:
+		continue
+	parts = line.split()
+	if len(parts) >= 2:
+		rows.append({"month": parts[1], "count": int(parts[0])})
+print(json.dumps(rows))
+'
+}
+
+FILES_JSON="$(
+	git log --format=format: --name-only --since="1 year ago" |
+		sort | uniq -c | sort -nr | head -20 |
+		json_files
+)"
+CONTRIBUTORS_JSON="$(
+	git shortlog -sn --no-merges --all | json_files
+)"
+MONTHS_JSON="$(
+	git log --format='%ad' --date=format:'%Y-%m' | sort | uniq -c |
+		json_months
+)"
+
+cat <<HTML
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Repository statistics</title>
+<style>
+  :root {
+    --bg: #0f1419;
+    --surface: #1a2332;
+    --text: #e7ecf3;
+    --muted: #8b9cb3;
+    --accent: #3d8bfd;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    margin: 0;
+    padding: 1.5rem 2rem 3rem;
+    line-height: 1.5;
+  }
+  h1 {
+    font-weight: 600;
+    font-size: 1.5rem;
+    margin: 0 0 0.25rem;
+    letter-spacing: -0.02em;
+  }
+  .sub {
+    color: var(--muted);
+    font-size: 0.9rem;
+    margin-bottom: 2rem;
+  }
+  section {
+    background: var(--surface);
+    border-radius: 12px;
+    padding: 1.25rem 1.5rem 1.5rem;
+    margin-bottom: 1.75rem;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  section h2 {
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin: 0 0 1rem;
+    color: var(--text);
+  }
+  .chart-wrap {
+    position: relative;
+    max-width: 520px;
+    margin: 0 auto;
+  }
+  .chart-wrap.wide { max-width: 900px; }
+  .contrib-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 1rem;
+    justify-content: center;
+    margin-top: 1rem;
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+  .contrib-legend span.top3 {
+    font-weight: 700;
+    color: var(--text);
+  }
+  .empty {
+    color: var(--muted);
+    text-align: center;
+    padding: 2rem;
+  }
+  @media print {
+    body { background: #fff; color: #111; padding: 1rem; }
+    .sub, .contrib-legend { color: #444; }
+    section {
+      background: #f8f9fb;
+      border: 1px solid #ddd;
+      break-inside: avoid;
+    }
+    :root {
+      --text: #111;
+      --muted: #444;
+    }
+    .contrib-legend span.top3 { color: #000; }
+  }
+</style>
+</head>
+<body>
+<h1>Repository statistics</h1>
+<p class="sub">Generated from the current Git repository.</p>
+
+<section>
+  <h2>Most changed files (last year, top 20)</h2>
+  <div id="files-empty" class="empty" hidden>No file change data in this range.</div>
+  <div class="chart-wrap"><canvas id="chart-files"></canvas></div>
+</section>
+
+<section>
+  <h2>Contributors by commit count (all time, no merges)</h2>
+  <div id="contrib-empty" class="empty" hidden>No contributor data.</div>
+  <div class="chart-wrap"><canvas id="chart-contrib"></canvas></div>
+  <div id="contrib-legend" class="contrib-legend" aria-label="Contributors"></div>
+</section>
+
+<section>
+  <h2>Commits by month (all time)</h2>
+  <div id="months-empty" class="empty" hidden>No commit history.</div>
+  <div class="chart-wrap wide"><canvas id="chart-months"></canvas></div>
+</section>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+  const filesData = ${FILES_JSON};
+  const contributorsData = ${CONTRIBUTORS_JSON};
+  const monthsData = ${MONTHS_JSON};
+
+  const palette = [
+    '#3d8bfd', '#22c55e', '#f59e0b', '#ec4899', '#8b5cf6', '#14b8a6',
+    '#ef4444', '#06b6d4', '#84cc16', '#f97316', '#6366f1', '#d946ef',
+    '#0ea5e9', '#eab308', '#64748b', '#a855f7', '#2dd4bf', '#fb7185',
+    '#4ade80', '#38bdf8'
+  ];
+
+  function truncate(s, max) {
+    if (s.length <= max) return s;
+    return s.slice(0, max - 1) + '…';
+  }
+
+  Chart.defaults.color = '#8b9cb3';
+  Chart.defaults.borderColor = 'rgba(255,255,255,0.08)';
+  Chart.defaults.font.family = '"Segoe UI", system-ui, sans-serif';
+
+  if (!filesData.length) {
+    document.getElementById('files-empty').hidden = false;
+  } else {
+    const labels = filesData.map(d => truncate(d.name, 48));
+    new Chart(document.getElementById('chart-files'), {
+      type: 'pie',
+      data: {
+        labels,
+        datasets: [{
+          data: filesData.map(d => d.count),
+          backgroundColor: filesData.map((_, i) => palette[i % palette.length]),
+          borderWidth: 1,
+          borderColor: '#1a2332'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+          legend: { position: 'right', labels: { boxWidth: 12, padding: 10 } },
+          tooltip: {
+            callbacks: {
+              title: (items) => {
+                const i = items[0].dataIndex;
+                return filesData[i].name;
+              },
+              label: (item) => {
+                const v = item.raw;
+                const sum = filesData.reduce((a, d) => a + d.count, 0);
+                const pct = sum ? ((v / sum) * 100).toFixed(1) : '0';
+                return ' ' + v + ' touches (' + pct + '%)';
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  const legendEl = document.getElementById('contrib-legend');
+  if (!contributorsData.length) {
+    document.getElementById('contrib-empty').hidden = false;
+  } else {
+    contributorsData.forEach((d, i) => {
+      const span = document.createElement('span');
+      if (i < 3) span.className = 'top3';
+      span.textContent = d.name + ': ' + d.count;
+      legendEl.appendChild(span);
+    });
+    const labels = contributorsData.map(d => truncate(d.name, 32));
+    new Chart(document.getElementById('chart-contrib'), {
+      type: 'pie',
+      data: {
+        labels,
+        datasets: [{
+          data: contributorsData.map(d => d.count),
+          backgroundColor: contributorsData.map((_, i) => palette[i % palette.length]),
+          borderWidth: 1,
+          borderColor: '#1a2332'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              title: (items) => {
+                const i = items[0].dataIndex;
+                return contributorsData[i].name;
+              },
+              label: (item) => {
+                const v = item.raw;
+                const sum = contributorsData.reduce((a, d) => a + d.count, 0);
+                const pct = sum ? ((v / sum) * 100).toFixed(1) : '0';
+                return ' ' + v + ' commits (' + pct + '%)';
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  if (!monthsData.length) {
+    document.getElementById('months-empty').hidden = false;
+  } else {
+    new Chart(document.getElementById('chart-months'), {
+      type: 'bar',
+      data: {
+        labels: monthsData.map(d => d.month),
+        datasets: [{
+          label: 'Commits',
+          data: monthsData.map(d => d.count),
+          backgroundColor: 'rgba(61, 139, 253, 0.75)',
+          borderColor: '#3d8bfd',
+          borderWidth: 1,
+          borderRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        scales: {
+          x: {
+            ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 24 },
+            grid: { display: false }
+          },
+          y: {
+            beginAtZero: true,
+            ticks: { precision: 0 },
+            grid: { color: 'rgba(255,255,255,0.06)' }
+          }
+        },
+        plugins: { legend: { display: false } }
+      }
+    });
+  }
+})();
+</script>
+</body>
+</html>
+HTML
