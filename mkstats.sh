@@ -44,13 +44,18 @@ MONTHS_JSON="$(
 		json_months
 )"
 
+REPO_DIR="$(basename -- "$PWD")"
+REPO_TITLE_ESC="$(
+	printf '%s' "$REPO_DIR" | python3 -c 'import html, sys; print(html.escape(sys.stdin.read()))'
+)"
+
 cat <<HTML
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Repository statistics</title>
+<title>${REPO_TITLE_ESC} - Repository statistics</title>
 <style>
   :root {
     --bg: #0f1419;
@@ -133,8 +138,7 @@ cat <<HTML
 </style>
 </head>
 <body>
-<h1>Repository statistics</h1>
-<p class="sub">Generated from the current Git repository.</p>
+<h1>${REPO_TITLE_ESC} - Repository statistics</h1>
 
 <section>
   <h2>Most changed files (last year, top 20)</h2>
