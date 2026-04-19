@@ -1,27 +1,47 @@
-# Repo stats
+# Repository statistics
 
-Generate statistics.
+This project generates visual summaries of Git activity for a repository.
 
-## What changed the most
+## Usage
+
+From the root of the repository you want to analyze:
+
+```shell
+cd /path/to/your/repo
+/path/to/repo-stats/mkstats.sh > index.html
+```
+
+Sample outputs are available under `examples/`.
+
+## Most frequently changed files
+
+The twenty files with the most changes over the past year. A single file standing out often indicates where most development or bugs resolution is concentrated.
 
 ```shell
 git log --format=format: --name-only --since="1 year ago" | sort | uniq -c | sort -nr | head -20
 ```
 
-The 20 most changed files last year.
+## Contributors
 
-## Who Built This
+Contributors ranked by commit count. The first chart covers the full project history; the second is limited to the year-to-date. Together they help illustrate whether participation is stable or whether the contributor mix shifts over time.
+
+This metric also provides insight into the project's bus factor, indicating how many contributors would need to become unavailable before knowledge or progress is significantly impacted.
 
 ```shell
-git shortlog -sn --no-merges
+git shortlog -sn --no-merges --all #--since="1 year ago
 ```
 
-Every contributor ranked by commit count.
+## Commit velocity
 
-## Is This Project Accelerating?
+Commits aggregated by calendar month, useful for observing trends in activity over time.
 
 ```shell
 git log --format='%ad' --date=format:'%Y-%m' | sort | uniq -c
 ```
 
-Commit count by month.
+## Disclaimer
+
+These statistics are a coarse view of repository activity. They should not be used as the primary basis for performance reviews or compensation decisions. Commit counts and similar aggregates are weak proxies for value delivered.
+
+* Complex work (for example, difficult algorithms or careful design) may require substantial time while producing relatively few commits.
+* Areas such as optimization or hardware-related troubleshooting in embedded systems often involve extensive investigation and testing that does not map cleanly to commit volume.
