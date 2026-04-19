@@ -151,7 +151,7 @@ cat <<HTML
 </head>
 <body>
 <h1>${REPO_TITLE_ESC} - Repository statistics</h1>
-<p class="sub">Generated ${GENERATED_AT_ESC}</p>
+<p class="sub">Generated ${GENERATED_AT_ESC} by <a href="https://github.com/marcinbis/git-repo-stats">https://github.com/marcinbis/git-repo-stats</a></p>
 
 <section>
   <h2>Most changed files (last year, top 20)</h2>
