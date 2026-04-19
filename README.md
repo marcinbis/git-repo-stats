@@ -11,7 +11,10 @@ cd /path/to/your/repo
 /path/to/repo-stats/mkstats.sh > index.html
 ```
 
-Sample outputs are available under `examples/`.
+Sample outputs are available under `examples/`:
+
+* [git-repo-stats-index.html](examples/git-repo-stats-index.html) - Example from this repository, representing an edge case with only a single contributor and a small number of commits.
+* [linux-kernel-index.html](examples/linux-kernel-index.html) - Example from the Linux Kernel repository, representing the opposite extreme. This file contains 1.5MB of data and the resulting graphs can be difficult to interpret. Nevertheless, the script executes correctly even on such large codebases.
 
 ## Most frequently changed files
 
