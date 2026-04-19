@@ -39,6 +39,9 @@ FILES_JSON="$(
 CONTRIBUTORS_JSON="$(
 	git shortlog -sn --no-merges --all | json_files
 )"
+CONTRIBUTORS_LAST_YEAR_JSON="$(
+	git shortlog -sn --no-merges --all --since="1 year ago" | json_files
+)"
 MONTHS_JSON="$(
 	git log --format='%ad' --date=format:'%Y-%m' | sort | uniq -c |
 		json_months
@@ -47,6 +50,9 @@ MONTHS_JSON="$(
 REPO_DIR="$(basename -- "$PWD")"
 REPO_TITLE_ESC="$(
 	printf '%s' "$REPO_DIR" | python3 -c 'import html, sys; print(html.escape(sys.stdin.read()))'
+)"
+GENERATED_AT_ESC="$(
+	date '+%Y-%m-%d %H:%M:%S %Z' | python3 -c 'import html, sys; print(html.escape(sys.stdin.read().strip()))'
 )"
 
 cat <<HTML
@@ -139,6 +145,7 @@ cat <<HTML
 </head>
 <body>
 <h1>${REPO_TITLE_ESC} - Repository statistics</h1>
+<p class="sub">Generated ${GENERATED_AT_ESC}</p>
 
 <section>
   <h2>Most changed files (last year, top 20)</h2>
@@ -154,6 +161,13 @@ cat <<HTML
 </section>
 
 <section>
+  <h2>Contributors by commit count (last year, no merges)</h2>
+  <div id="contrib-last-year-empty" class="empty" hidden>No contributor data in this range.</div>
+  <div class="chart-wrap"><canvas id="chart-contrib-last-year"></canvas></div>
+  <div id="contrib-last-year-legend" class="contrib-legend" aria-label="Contributors (last year)"></div>
+</section>
+
+<section>
   <h2>Commits by month (all time)</h2>
   <div id="months-empty" class="empty" hidden>No commit history.</div>
   <div class="chart-wrap wide"><canvas id="chart-months"></canvas></div>
@@ -165,6 +179,7 @@ cat <<HTML
 (function () {
   const filesData = ${FILES_JSON};
   const contributorsData = ${CONTRIBUTORS_JSON};
+  const contributorsLastYearData = ${CONTRIBUTORS_LAST_YEAR_JSON};
   const monthsData = ${MONTHS_JSON};
 
   Chart.register(ChartDataLabels);
@@ -292,6 +307,57 @@ cat <<HTML
               label: (item) => {
                 const v = item.raw;
                 const sum = contributorsData.reduce((a, d) => a + d.count, 0);
+                const pct = sum ? ((v / sum) * 100).toFixed(1) : '0';
+                return ' ' + v + ' commits (' + pct + '%)';
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  const legendLastYearEl = document.getElementById('contrib-last-year-legend');
+  if (!contributorsLastYearData.length) {
+    document.getElementById('contrib-last-year-empty').hidden = false;
+  } else {
+    contributorsLastYearData.forEach((d, i) => {
+      const span = document.createElement('span');
+      if (i < 5) span.className = 'top5';
+      span.textContent = d.name + ': ' + d.count;
+      legendLastYearEl.appendChild(span);
+    });
+    const labelsLy = contributorsLastYearData.map(d => truncate(d.name, 32));
+    new Chart(document.getElementById('chart-contrib-last-year'), {
+      type: 'pie',
+      data: {
+        labels: labelsLy,
+        datasets: [{
+          data: contributorsLastYearData.map(d => d.count),
+          backgroundColor: contributorsLastYearData.map((_, i) => palette[i % palette.length]),
+          borderWidth: 1,
+          borderColor: '#1a2332'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+          datalabels: topFivePieLabels(function (value, ctx) {
+            var sum = contributorsLastYearData.reduce(function (a, d) { return a + d.count; }, 0);
+            var pct = sum ? ((value / sum) * 100).toFixed(1) : '0';
+            return value + ' commits (' + pct + '%)';
+          }),
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              title: (items) => {
+                const i = items[0].dataIndex;
+                return contributorsLastYearData[i].name;
+              },
+              label: (item) => {
+                const v = item.raw;
+                const sum = contributorsLastYearData.reduce((a, d) => a + d.count, 0);
                 const pct = sum ? ((v / sum) * 100).toFixed(1) : '0';
                 return ' ' + v + ' commits (' + pct + '%)';
               }
