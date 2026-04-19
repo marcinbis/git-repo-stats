@@ -3,9 +3,10 @@ set -euo pipefail
 
 json_files() {
 	python3 -c '
-import sys, json
+import sys, json, io
+stdin = io.TextIOWrapper(sys.stdin.buffer, encoding="utf-8", errors="replace")
 rows = []
-for line in sys.stdin:
+for line in stdin:
 	line = line.strip()
 	if not line:
 		continue
@@ -18,9 +19,10 @@ print(json.dumps(rows))
 
 json_months() {
 	python3 -c '
-import sys, json
+import sys, json, io
+stdin = io.TextIOWrapper(sys.stdin.buffer, encoding="utf-8", errors="replace")
 rows = []
-for line in sys.stdin:
+for line in stdin:
 	line = line.strip()
 	if not line:
 		continue
@@ -31,7 +33,10 @@ print(json.dumps(rows))
 '
 }
 
+# head closes the pipe after 20 lines; sort -nr then gets SIGPIPE (141).
+# With pipefail that fails the whole pipeline — disable pipefail here only.
 FILES_JSON="$(
+	set +o pipefail
 	git log --format=format: --name-only --since="1 year ago" |
 		sort | uniq -c | sort -nr | head -20 |
 		json_files
@@ -49,10 +54,10 @@ MONTHS_JSON="$(
 
 REPO_DIR="$(basename -- "$PWD")"
 REPO_TITLE_ESC="$(
-	printf '%s' "$REPO_DIR" | python3 -c 'import html, sys; print(html.escape(sys.stdin.read()))'
+	printf '%s' "$REPO_DIR" | python3 -c 'import html, sys, io; stdin = io.TextIOWrapper(sys.stdin.buffer, encoding="utf-8", errors="replace"); print(html.escape(stdin.read()))'
 )"
 GENERATED_AT_ESC="$(
-	date '+%Y-%m-%d %H:%M:%S %Z' | python3 -c 'import html, sys; print(html.escape(sys.stdin.read().strip()))'
+	date '+%Y-%m-%d %H:%M:%S %Z' | python3 -c 'import html, sys, io; stdin = io.TextIOWrapper(sys.stdin.buffer, encoding="utf-8", errors="replace"); print(html.escape(stdin.read().strip()))'
 )"
 
 cat <<HTML
