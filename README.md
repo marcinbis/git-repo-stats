@@ -31,7 +31,7 @@ Contributors ranked by commit count. The first chart covers the full project his
 This metric also provides insight into the project's bus factor, indicating how many contributors would need to become unavailable before knowledge or progress is significantly impacted.
 
 ```shell
-git shortlog -sn --no-merges --all #--since="1 year ago
+git shortlog -sn --no-merges #--since="1 year ago
 ```
 
 ## Commit velocity

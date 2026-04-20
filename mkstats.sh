@@ -43,10 +43,10 @@ FILES_JSON="$(
 		json_files
 )"
 CONTRIBUTORS_JSON="$(
-	git shortlog -sn --no-merges --all | json_files
+	git shortlog -sn --no-merges | json_files
 )"
 CONTRIBUTORS_LAST_YEAR_JSON="$(
-	git shortlog -sn --no-merges --all --since="1 year ago" | json_files
+	git shortlog -sn --no-merges --since="1 year ago" | json_files
 )"
 MONTHS_JSON="$(
 	git log --format='%ad' --date=format:'%Y-%m' | sort | uniq -c |
